@@ -1,0 +1,29 @@
+[source]
+type = "N2N"
+address = "relays-new.cardano-mainnet.iohk.io:3001"
+
+[chain]
+type = "Mainnet"
+
+[intersect]
+type = "Origin"
+
+[enrich]
+type = "Sled"
+db_path = "~/data/scrolls/sled"
+
+[[reducers]]
+type = "BalanceByAddress"
+
+[[reducers]]
+type = "TxCountByAddress"
+
+[[reducers]]
+type = "SupplyByAsset"
+
+[storage]
+type = "Redis"
+connection_params = "redis://localhost:6379"
+
+[policy]
+missing_data = "Skip"

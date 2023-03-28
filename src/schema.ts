@@ -14,10 +14,10 @@ export const schema = createSchema({
     type Query {
       ping: String
       asset_holders_by_asset_id(asset_id: String!, epoch_no: Int, prefix: String): [String]
-      balance_by_address(address: String!, prefix: String): Int
-      balance_by_stake(stake_address: String!, prefix: String): Int
-      txcount_by_address(address: String!, prefix: String): Int
-      supply_by_asset(asset_id: String!, prefix: String): Int
+      balance_by_address(address: String!, prefix: String): Float
+      balance_by_stake(stake_address: String!, prefix: String): Float
+      txcount_by_address(address: String!, prefix: String): Float
+      supply_by_asset(asset_id: String!, prefix: String): Float
     }
   `,
   resolvers: {

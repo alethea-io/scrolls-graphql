@@ -1,0 +1,24 @@
+version: "3.7"
+
+services:
+  kvrocks:
+    image: apache/kvrocks
+    volumes:
+      - ./data/kvrocks:/var/lib/kvrocks
+    ports:
+      - 6379:6666
+
+  scrolls:
+    image: ghcr.io/txpipe/scrolls:latest
+    command: [ "daemon" ]
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./daemon.toml:/etc/scrolls/daemon.toml
+
+  scrolls-graphql:
+    image: scrolls-graphql
+    environment:
+      - REDIS_URL=kvrocks:6666
+    ports:
+      - 4000:4000
