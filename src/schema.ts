@@ -88,6 +88,10 @@ export const schema = createSchema({
           'BYSCORE',
           "WITHSCORES",
         )
+
+        if(assets_by_address.length == 0) {
+          return 
+        }
         
         let assets = assets_by_address
           .filter(i => !isNaN(parseFloat(i)))
@@ -150,6 +154,10 @@ export const schema = createSchema({
           'BYSCORE',
           "WITHSCORES",
         )
+
+        if(assets_by_stake_key.length == 0) {
+          return 
+        }
 
         let assets = assets_by_stake_key
           .filter(i => !isNaN(parseFloat(i)))
