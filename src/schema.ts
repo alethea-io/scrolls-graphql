@@ -60,9 +60,9 @@ export const schema = createSchema({
 
     type Query {
       ping: String
-      address(address: String!): Address
-      stake_key(stake_key: String!): StakeKey
-      token(asset: String!): Token
+      scrolls_address(address: String!): Address
+      scrolls_stake_key(stake_key: String!): StakeKey
+      scrolls_token(asset: String!): Token
     }
   `,
   resolvers: {
@@ -70,9 +70,9 @@ export const schema = createSchema({
       ping: async () => {
         return await redis.ping()
       },
-      address: async (_, { address }) => ({ address }),
-      stake_key: async (_, { stake_key }) => ({ stake_key }),
-      token: async (_, { asset }) => ({ asset }),
+      scrolls_address: async (_, { address }) => ({ address }),
+      scrolls_stake_key: async (_, { stake_key }) => ({ stake_key }),
+      scrolls_token: async (_, { asset }) => ({ asset }),
     },
     Address: {
       balance: async (parent, { prefix=null }) => {
@@ -85,7 +85,6 @@ export const schema = createSchema({
           `${prefix ?? "assets_by_address"}.${parent.address}`,
           1,
           999999999,
-          'BYSCORE',
           "WITHSCORES",
         )
 
@@ -151,7 +150,6 @@ export const schema = createSchema({
           `${prefix ?? "assets_by_stake_key"}.${parent.stake_key}`,
           1,
           999999999,
-          'BYSCORE',
           "WITHSCORES",
         )
 
