@@ -84,7 +84,7 @@ export const schema = createSchema({
         let assets_by_address = await redis.zrange(
           `${prefix ?? "assets_by_address"}.${parent.address}`,
           1,
-          '+inf',
+          999999999,
           'BYSCORE',
           "WITHSCORES",
         )
@@ -92,7 +92,7 @@ export const schema = createSchema({
         let assets = assets_by_address
           .filter(i => !isNaN(parseInt(i)))
           .map(i => 'supply_by_asset.' + i.replace('.', ''))
-        console.log(assets)
+
         let supply = await redis.mget(...assets)
         let supply_by_asset = zip(assets, supply)
 
@@ -146,7 +146,7 @@ export const schema = createSchema({
         let assets_by_stake_key = await redis.zrange(
           `${prefix ?? "assets_by_stake_key"}.${parent.stake_key}`,
           1,
-          '+inf',
+          999999999,
           'BYSCORE',
           "WITHSCORES",
         )
@@ -209,7 +209,7 @@ export const schema = createSchema({
         let addresses_by_asset = await redis.zrange(
           `${prefix ?? "addresses_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
           1,
-          '+inf',
+          999999999,
           'BYSCORE',
           "WITHSCORES",
         )
@@ -232,7 +232,7 @@ export const schema = createSchema({
         let stake_keys_by_asset = await redis.zrange(
           `${prefix ?? "stake_keys_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
           1,
-          '+inf',
+          999999999,
           'BYSCORE',
           "WITHSCORES",
         )
