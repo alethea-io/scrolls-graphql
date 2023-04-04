@@ -25,6 +25,8 @@ export const schema = createSchema({
       tokens: [TokenBalance]
       nft_count: Int
       nfts: [TokenBalance]
+      ada_handle_count: Int
+      ada_handles: [TokenBalance]
     }
 
     type Address {
@@ -96,6 +98,7 @@ export const schema = createSchema({
 
         var tokens = []
         var nfts = []
+        var ada_handles = []
         for (var i = 0; i < assets_by_address.length; i+=2) {
           let subject = assets_by_address[i]
           let quantity = parseInt(assets_by_address[i+1])
@@ -106,11 +109,15 @@ export const schema = createSchema({
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + subject.replace('.', '')]
+          let supply = supply_by_asset['supply_by_asset.' + token.policy_id + token.name]
           if(supply > 1) {
             tokens.push(token)
           } else {
             nfts.push(token)
+          }
+
+          if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
+            ada_handles.push(token)
           }
         }
 
@@ -119,6 +126,8 @@ export const schema = createSchema({
           tokens: tokens,
           nft_count: nfts.length,
           nfts: nfts,
+          ada_handle_count: ada_handles.length,
+          ada_handles: ada_handles
         }
       },
       tx_count: async (parent, { prefix=null }) => {
@@ -145,12 +154,13 @@ export const schema = createSchema({
         let assets = assets_by_stake_key
           .filter(i => !isNaN(parseInt(i)))
           .map(i => 'supply_by_asset.' + i.replace('.', ''))
-        console.log(assets)
+
         let supply = await redis.mget(...assets)
         let supply_by_asset = zip(assets, supply)
 
         var tokens = []
         var nfts = []
+        var ada_handles = []
         for (var i = 0; i < assets_by_stake_key.length; i+=2) {
           let subject = assets_by_stake_key[i]
           let quantity = parseInt(assets_by_stake_key[i+1])
@@ -161,11 +171,15 @@ export const schema = createSchema({
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + subject.replace('.', '')]
+          let supply = supply_by_asset['supply_by_asset.' + token.policy_id + token.name]
           if(supply > 1) {
             tokens.push(token)
           } else {
             nfts.push(token)
+          }
+
+          if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
+            ada_handles.push(token)
           }
         }
 
@@ -174,6 +188,8 @@ export const schema = createSchema({
           tokens: tokens,
           nft_count: nfts.length,
           nfts: nfts,
+          ada_handle_count: ada_handles.length,
+          ada_handles: ada_handles,
         }
       },
       tx_count: async (parent, { prefix=null }) => {
