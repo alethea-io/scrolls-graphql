@@ -90,7 +90,7 @@ export const schema = createSchema({
         )
         
         let assets = assets_by_address
-          .filter(i => !isNaN(parseInt(i)))
+          .filter(i => !isNaN(parseFloat(i)))
           .map(i => 'supply_by_asset.' + i.replace('.', ''))
 
         let supply = await redis.mget(...assets)
@@ -101,7 +101,7 @@ export const schema = createSchema({
         var ada_handles = []
         for (var i = 0; i < assets_by_address.length; i+=2) {
           let subject = assets_by_address[i]
-          let quantity = parseInt(assets_by_address[i+1])
+          let quantity = parseFloat(assets_by_address[i+1])
 
           let token = {
             policy_id: subject.split('.')[0],
@@ -152,7 +152,7 @@ export const schema = createSchema({
         )
 
         let assets = assets_by_stake_key
-          .filter(i => !isNaN(parseInt(i)))
+          .filter(i => !isNaN(parseFloat(i)))
           .map(i => 'supply_by_asset.' + i.replace('.', ''))
 
         let supply = await redis.mget(...assets)
@@ -163,7 +163,7 @@ export const schema = createSchema({
         var ada_handles = []
         for (var i = 0; i < assets_by_stake_key.length; i+=2) {
           let subject = assets_by_stake_key[i]
-          let quantity = parseInt(assets_by_stake_key[i+1])
+          let quantity = parseFloat(assets_by_stake_key[i+1])
 
           let token = {
             policy_id: subject.split('.')[0],
@@ -217,7 +217,7 @@ export const schema = createSchema({
         var addresses = []
         for (var i = 0; i < addresses_by_asset.length; i+=2) {
           let address = addresses_by_asset[i]
-          let quantity = parseInt(addresses_by_asset[i+1])
+          let quantity = parseFloat(addresses_by_asset[i+1])
 
           addresses.push({
             address: address,
@@ -240,7 +240,7 @@ export const schema = createSchema({
         var stake_keys = []
         for (var i = 0; i < stake_keys_by_asset.length; i+=2) {
           let stake_key = stake_keys_by_asset[i]
-          let quantity = parseInt(stake_keys_by_asset[i+1])
+          let quantity = parseFloat(stake_keys_by_asset[i+1])
 
           stake_keys.push({
             stake_key: stake_key,
