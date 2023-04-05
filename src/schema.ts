@@ -1,6 +1,8 @@
 import Redis from 'ioredis'
 import { createSchema } from 'graphql-yoga'
 
+const AssetFingerprint = require('@emurgo/cip14-js').default;
+
 const zip = (a: any, b: any) => a.map((k: any, i: string | number) => [k, b[i]]);
 
 const REDIS_URL = process.env.REDIS_URL ?? 'localhost:6379'
@@ -17,6 +19,7 @@ export const schema = createSchema({
     type TokenBalance {
       policy_id: String
       name: String
+      fingerprint: String
       quantity: Float
     }
 
@@ -59,7 +62,6 @@ export const schema = createSchema({
     }
 
     type Query {
-      ping: String
       scrolls_address(address: String!): Address
       scrolls_stake_key(stake_key: String!): StakeKey
       scrolls_token(asset: String!): Token
@@ -67,9 +69,6 @@ export const schema = createSchema({
   `,
   resolvers: {
     Query: {
-      ping: async () => {
-        return await redis.ping()
-      },
       scrolls_address: async (_, { address }) => ({ address }),
       scrolls_stake_key: async (_, { stake_key }) => ({ stake_key }),
       scrolls_token: async (_, { asset }) => ({ asset }),
@@ -106,20 +105,29 @@ export const schema = createSchema({
           let subject = assets_by_address[i]
           let quantity = parseFloat(assets_by_address[i+1])
 
+          let policy_id = subject.split('.')[0];
+          let name = subject.split('.')[1];
+
+          const fingerprint: string = AssetFingerprint.fromParts(
+            Buffer.from(policy_id, 'hex'), 
+            Buffer.from(name, 'hex')
+          );
+
           let token = {
-            policy_id: subject.split('.')[0],
-            name: subject.split('.')[1],
+            policy_id: `\\x${policy_id}`,
+            name: `\\x${name}`,
+            fingerprint: fingerprint,
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + token.policy_id + token.name]
+          let supply = supply_by_asset['supply_by_asset.' + policy_id + name]
           if(supply > 1) {
             tokens.push(token)
           } else {
             nfts.push(token)
           }
 
-          if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
+          if(policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
             ada_handles.push(token)
           }
         }
@@ -171,20 +179,29 @@ export const schema = createSchema({
           let subject = assets_by_stake_key[i]
           let quantity = parseFloat(assets_by_stake_key[i+1])
 
+          let policy_id = subject.split('.')[0];
+          let name = subject.split('.')[1];
+
+          const fingerprint: string = AssetFingerprint.fromParts(
+            Buffer.from(policy_id, 'hex'), 
+            Buffer.from(name, 'hex')
+          );
+
           let token = {
-            policy_id: subject.split('.')[0],
-            name: subject.split('.')[1],
+            policy_id: `\\x${policy_id}`,
+            name: `\\x${name}`,
+            fingerprint: fingerprint,
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + token.policy_id + token.name]
+          let supply = supply_by_asset['supply_by_asset.' + policy_id + name]
           if(supply > 1) {
             tokens.push(token)
           } else {
             nfts.push(token)
           }
 
-          if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
+          if(policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
             ada_handles.push(token)
           }
         }
