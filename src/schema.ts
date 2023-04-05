@@ -120,7 +120,7 @@ export const schema = createSchema({
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + policy_id + name]
+          let supply = parseFloat(supply_by_asset['supply_by_asset.' + policy_id + name])
           if(supply > 1) {
             tokens.push(token)
           } else {
@@ -194,7 +194,7 @@ export const schema = createSchema({
             quantity: quantity,
           }
 
-          let supply = supply_by_asset['supply_by_asset.' + policy_id + name]
+          let supply = parseFloat(supply_by_asset['supply_by_asset.' + policy_id + name])
           if(supply > 1) {
             tokens.push(token)
           } else {
