@@ -1,19 +1,39 @@
 import express from 'express'
-import { createYoga } from 'graphql-yoga'
+import { createYoga, YogaInitialContext } from 'graphql-yoga'
+import Redis from 'ioredis'
 import { schema } from './schema'
 
 const PORT = process.env.PORT ?? 4000
+const REDIS_URL = process.env.REDIS_URL ?? 'localhost:6379'
 
-// Create express server
-const server = express()
+export interface GraphQLContext extends YogaInitialContext {
+  redis: Redis
+}
 
-// Create a Yoga instance with a GraphQL schema.
-const yoga = createYoga({ schema })
+const main = async () => {
+  // Create redis instance
+  console.info(`Connecting to Redis at ${REDIS_URL}`)
+  const redis = new Redis(REDIS_URL)
 
-// Set base path for graphql api
-server.use('/graphql', yoga)
+  // Create a Yoga instance with a GraphQL schema.
+  const yoga = createYoga({
+    schema: schema,
+    context: ({request}) => ({
+      request,
+      redis: redis
+    })
+  })
 
-// Start the server
-server.listen(PORT, () => {
-  console.info(`Server is running on http://localhost:${PORT}/graphql`)
-})
+  // Create express server
+  const server = express()
+
+  // Set base path for graphql api
+  server.use('/graphql', yoga)
+
+  // Start the server
+  server.listen(PORT, () => {
+    console.info(`Server is running on http://localhost:${PORT}/graphql`)
+  })
+}
+
+main()

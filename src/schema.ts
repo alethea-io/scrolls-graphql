@@ -1,22 +1,17 @@
-import Redis from 'ioredis'
 import { createSchema } from 'graphql-yoga'
+import Redis from 'ioredis';
+import { GraphQLContext } from "./index";
 
 const AssetFingerprint = require('@emurgo/cip14-js').default;
 
-const zip = (a: any, b: any) => a.map((k: any, i: string | number) => [k, b[i]]);
-
-const REDIS_URL = process.env.REDIS_URL ?? 'localhost:6379'
-
-console.info(`Connecting to Redis at ${REDIS_URL}`)
-
-// Create redis client
-const redis = new Redis(REDIS_URL)
+const MAX_SET_SIZE = 1e6
 
 // Create GraphQL schema
-export const schema = createSchema({
+export const schema = createSchema<GraphQLContext>({
   typeDefs: /* GraphQL */ `
 
     type TokenBalance {
+      idx: Int
       policy_id: String
       name: String
       fingerprint: String
@@ -24,23 +19,23 @@ export const schema = createSchema({
     }
 
     type TokenType {
-      token_count: Int
+      count: Int
       tokens: [TokenBalance]
-      nft_count: Int
-      nfts: [TokenBalance]
-      ada_handle_count: Int
-      ada_handles: [TokenBalance]
     }
 
     type Address {
       balance(prefix: String): Float
       tokens(prefix: String): TokenType
+      nfts(prefix: String): TokenType
+      ada_handles(prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
     type StakeKey {
       balance(prefix: String): Float
       tokens(prefix: String): TokenType
+      nfts(prefix: String): TokenType
+      ada_handles(prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
@@ -74,165 +69,59 @@ export const schema = createSchema({
       scrolls_token: async (_, { asset }) => ({ asset }),
     },
     Address: {
-      balance: async (parent, { prefix=null }) => {
+      balance: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
           `${prefix ?? "balance_by_address"}.${parent.address}`
         )
       },
-      tokens: async (parent, { prefix=null }) => {
-        let assets_by_address = await redis.zrange(
-          `${prefix ?? "assets_by_address"}.${parent.address}`,
-          1,
-          999999999,
-          "WITHSCORES",
-        )
-
-        if(assets_by_address.length == 0) {
-          return 
-        }
-        
-        let assets = assets_by_address
-          .filter(i => !isNaN(parseFloat(i)))
-          .map(i => 'supply_by_asset.' + i.replace('.', ''))
-
-        let supply = await redis.mget(...assets)
-        let supply_by_asset = zip(assets, supply)
-
-        var tokens = []
-        var nfts = []
-        var ada_handles = []
-        for (var i = 0; i < assets_by_address.length; i+=2) {
-          let subject = assets_by_address[i]
-          let quantity = parseFloat(assets_by_address[i+1])
-
-          let policy_id = subject.split('.')[0];
-          let name = subject.split('.')[1];
-
-          const fingerprint: string = AssetFingerprint.fromParts(
-            Buffer.from(policy_id, 'hex'), 
-            Buffer.from(name, 'hex')
-          );
-
-          let token = {
-            policy_id: `\\x${policy_id}`,
-            name: `\\x${name}`,
-            fingerprint: fingerprint,
-            quantity: quantity,
-          }
-
-          let supply = parseFloat(supply_by_asset['supply_by_asset.' + policy_id + name])
-          if(supply > 1) {
-            tokens.push(token)
-          } else {
-            nfts.push(token)
-          }
-
-          if(policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
-            ada_handles.push(token)
-          }
-        }
-
-        return {
-          token_count: tokens.length,
-          tokens: tokens,
-          nft_count: nfts.length,
-          nfts: nfts,
-          ada_handle_count: ada_handles.length,
-          ada_handles: ada_handles
-        }
+      tokens: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "fungible", limit, cursor, prefix, redis)
       },
-      tx_count: async (parent, { prefix=null }) => {
+      nfts: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "nft", limit, cursor, prefix, redis)
+      },
+      ada_handles: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "handle", limit, cursor, prefix, redis)
+      },
+      tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
           `${prefix ?? "txcount_by_address"}.${parent.address}`
         )
       },
     },
     StakeKey: {
-      balance: async (parent, { prefix=null }) => {
+      balance: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
           `${prefix ?? "balance_by_stake_key"}.${parent.stake_key}`
         )
       },
-      tokens: async (parent, { prefix=null }) => {
-        let assets_by_stake_key = await redis.zrange(
-          `${prefix ?? "assets_by_stake_key"}.${parent.stake_key}`,
-          1,
-          999999999,
-          "WITHSCORES",
-        )
-
-        if(assets_by_stake_key.length == 0) {
-          return 
-        }
-
-        let assets = assets_by_stake_key
-          .filter(i => !isNaN(parseFloat(i)))
-          .map(i => 'supply_by_asset.' + i.replace('.', ''))
-
-        let supply = await redis.mget(...assets)
-        let supply_by_asset = zip(assets, supply)
-
-        var tokens = []
-        var nfts = []
-        var ada_handles = []
-        for (var i = 0; i < assets_by_stake_key.length; i+=2) {
-          let subject = assets_by_stake_key[i]
-          let quantity = parseFloat(assets_by_stake_key[i+1])
-
-          let policy_id = subject.split('.')[0];
-          let name = subject.split('.')[1];
-
-          const fingerprint: string = AssetFingerprint.fromParts(
-            Buffer.from(policy_id, 'hex'), 
-            Buffer.from(name, 'hex')
-          );
-
-          let token = {
-            policy_id: `\\x${policy_id}`,
-            name: `\\x${name}`,
-            fingerprint: fingerprint,
-            quantity: quantity,
-          }
-
-          let supply = parseFloat(supply_by_asset['supply_by_asset.' + policy_id + name])
-          if(supply > 1) {
-            tokens.push(token)
-          } else {
-            nfts.push(token)
-          }
-
-          if(policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a') {
-            ada_handles.push(token)
-          }
-        }
-
-        return {
-          token_count: tokens.length,
-          tokens: tokens,
-          nft_count: nfts.length,
-          nfts: nfts,
-          ada_handle_count: ada_handles.length,
-          ada_handles: ada_handles,
-        }
+      tokens: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "fungible", limit, cursor, prefix, redis)
       },
-      tx_count: async (parent, { prefix=null }) => {
+      nfts: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "nft", limit, cursor, prefix, redis)
+      },
+      ada_handles: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
+        return getTokensByAddress(parent, "handle", limit, cursor, prefix, redis)
+      },
+      tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
           `${prefix ?? "tx_count_by_stake_key"}.${parent.stake_key}`
         )
       },
     },
     Token: {
-      supply: async (parent, { prefix=null }) => {
+      supply: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
           `${prefix ?? "supply_by_asset"}.${parent.asset}`
         )
       },
-      addresses: async (parent, { epoch_no=null, prefix=null }) => {
+      addresses: async (parent, { epoch_no=null, prefix=null }, { redis }) => {
         let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
         let addresses_by_asset = await redis.zrange(
           `${prefix ?? "addresses_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
           1,
-          999999999,
+          MAX_SET_SIZE,
           'BYSCORE',
           "WITHSCORES",
         )
@@ -250,12 +139,12 @@ export const schema = createSchema({
         
         return addresses
       },
-      stake_keys: async (parent, { epoch_no=null, prefix=null }) => {
+      stake_keys: async (parent, { epoch_no=null, prefix=null }, { redis }) => {
         let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
         let stake_keys_by_asset = await redis.zrange(
           `${prefix ?? "stake_keys_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
           1,
-          999999999,
+          MAX_SET_SIZE,
           'BYSCORE',
           "WITHSCORES",
         )
@@ -273,7 +162,7 @@ export const schema = createSchema({
         
         return stake_keys
       },
-      tx_count: async (parent, { prefix=null }) => {
+      tx_count: async (parent, { prefix=null }, { redis }) => {
         let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
         return await redis.get(
           `${prefix ?? "tx_count_by_asset"}.${asset}`
@@ -282,3 +171,90 @@ export const schema = createSchema({
     }
   }
 })
+
+async function getTokensByAddress(
+  parent: any, 
+  tokenType: string, 
+  limit: number, 
+  cursor: number, 
+  prefix: string, 
+  redis: Redis
+) {
+
+  var key;
+  var keyPrefix;
+
+  if("address" in parent) {
+    key = parent.address
+    keyPrefix = prefix ?? "assets_by_address"
+  } else if("stake_key" in parent) {
+    key = parent.stake_key
+    keyPrefix = prefix ?? "assets_by_stake_key"
+  } else return
+
+  let assetsByKey = tokenType == "nft" || tokenType == "handle"
+    ? await redis.zrange(`${keyPrefix}.${key}`, 1, 1, "BYSCORE", "WITHSCORES")
+    : await redis.zrange(`${keyPrefix}.${key}`, 1, MAX_SET_SIZE, "WITHSCORES")
+
+  console.log(`${keyPrefix}.${key}`)
+  console.log(assetsByKey)
+
+  if(assetsByKey.length == 0) return 
+  
+  // Get supply of each asset
+  var assetList = []
+  for (var i = 0; i < assetsByKey.length; i+=2) {
+    assetList.push('supply_by_asset.' + assetsByKey[i].replace('.', ''))
+  }
+  let supplyList = await redis.mget(...assetList)
+
+  var tokens = []
+  for (var i = 0; i < assetsByKey.length; i+=2) {
+    let subject = assetsByKey[i]
+    let quantity = parseFloat(assetsByKey[i+1])
+
+    let policy_id = subject.split('.')[0];
+    let name = subject.split('.')[1];
+
+    const fingerprint: string = AssetFingerprint.fromParts(
+      Buffer.from(policy_id, 'hex'), 
+      Buffer.from(name, 'hex')
+    );
+
+    let token = {
+      idx: i/2,
+      policy_id: `\\x${policy_id}`,
+      name: `\\x${name}`,
+      fingerprint: fingerprint,
+      quantity: quantity,
+    }
+
+    let supply = parseFloat(supplyList[i/2] ?? "0")
+
+    switch(tokenType) {
+      case "fungible":
+        if(supply > 1) 
+          tokens.push(token)
+        break
+      case "nft":
+        if(supply == 1)
+          tokens.push(token)
+        break
+      case "handle":
+        // 815418a1b078a259e678ecccc9d7eac7648d10b88f6f75ce2db8a25a.4672616374696f6e2045737461746520546f6b656e
+        if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a')
+          tokens.push(token)
+        break
+      default:
+        continue
+    }
+  }
+
+  return {
+    count: tokens.length,
+    tokens: tokens.slice(cursor, cursor + limit),
+  }
+}
+
+async function getAddressesByAsset(parent: any, prefix: string, redis: Redis) {
+}
