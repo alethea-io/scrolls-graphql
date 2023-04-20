@@ -52,7 +52,9 @@ export const schema = createSchema<GraphQLContext>({
     type Token {
       supply(prefix: String): Float
       addresses(prefix: String, epoch_no: Int): [AddressBalance]
+      address_count(prefix: String, epoch_no: Int): Int
       stake_keys(prefix: String, epoch_no: Int): [StakeKeyBalance]
+      stake_key_count(prefix: String, epoch_no: Int): Int
       tx_count(prefix: String): Int
     }
 
@@ -121,11 +123,17 @@ export const schema = createSchema<GraphQLContext>({
       addresses: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
         return getAddressesByAsset(parent, "addresses", epoch_no, prefix, redis);
       },
+      address_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressCountByAsset(parent, "addresses", epoch_no, prefix, redis);
+      },
       stake_keys: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
         return getAddressesByAsset(parent, "stake_keys", epoch_no, prefix, redis);
       },
+      stake_key_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressCountByAsset(parent, "stake_keys", epoch_no, prefix, redis);
+      },
       tx_count: async (parent, { prefix=null }, { redis }) => {
-        let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
+        let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
         console.log(asset)
         return await redis.get(
           `${prefix ?? "tx_count_by_asset"}.${asset}`
@@ -223,7 +231,9 @@ async function getAddressesByAsset(
   redis: Redis
 ) {
   let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
-  let key = `${prefix ?? addressType}_by_asset.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
+  let key_prefix = prefix ?? `${addressType}_by_asset`
+  let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
+  
   let addressesByAsset = await redis.zrange(
     key,
     1,
@@ -256,4 +266,18 @@ async function getAddressesByAsset(
   }
   
   return addresses;
+}
+
+async function getAddressCountByAsset(
+  parent: any,
+  addressType: string,
+  epoch_no: number | null,
+  prefix: string,
+  redis: Redis
+) {
+  let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
+  let key_prefix = prefix ?? `${addressType}_by_asset`
+  let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
+
+  return await redis.zcard(key);
 }
