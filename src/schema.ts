@@ -113,6 +113,7 @@ export const schema = createSchema<GraphQLContext>({
     Token: {
       supply: async (parent, { prefix=null }, { redis }) => {
         let asset = `${parent.policy_id}${parent.name}`
+        console.log(asset)
         return await redis.get(
           `${prefix ?? "supply_by_asset"}.${asset}`
         )
@@ -125,6 +126,7 @@ export const schema = createSchema<GraphQLContext>({
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         let asset = `${parent.policy_id}${parent.name}`
+        console.log(asset)
         return await redis.get(
           `${prefix ?? "tx_count_by_asset"}.${asset}`
         )
