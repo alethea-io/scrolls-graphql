@@ -98,13 +98,13 @@ export const schema = createSchema<GraphQLContext>({
         )
       },
       tokens: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "fungible", limit, cursor, prefix, redis)
+        return getTokensByAddress(parent, "fungible", cursor, limit, prefix, redis)
       },
       nfts: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "nft", limit, cursor, prefix, redis)
+        return getTokensByAddress(parent, "nft", cursor, limit, prefix, redis)
       },
       ada_handles: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "handle", limit, cursor, prefix, redis)
+        return getTokensByAddress(parent, "handle", cursor, limit, prefix, redis)
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
@@ -115,19 +115,19 @@ export const schema = createSchema<GraphQLContext>({
     Token: {
       supply: async (parent, { prefix=null }, { redis }) => {
         let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
-        
+
         return await redis.get(
           `${prefix ?? "supply_by_asset"}.${asset}`
         )
       },
-      addresses: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressesByAsset(parent, "addresses", epoch_no, prefix, redis);
+      addresses: async (parent, { cursor=0, limit=MAX_SET_SIZE, epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset(parent, "addresses", cursor, limit, epoch_no, prefix, redis);
       },
       address_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
         return getAddressCountByAsset(parent, "addresses", epoch_no, prefix, redis);
       },
-      stake_keys: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressesByAsset(parent, "stake_keys", epoch_no, prefix, redis);
+      stake_keys: async (parent, { cursor=0, limit=MAX_SET_SIZE, epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset(parent, "stake_keys", cursor, limit, epoch_no, prefix, redis);
       },
       stake_key_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
         return getAddressCountByAsset(parent, "stake_keys", epoch_no, prefix, redis);
@@ -145,9 +145,9 @@ export const schema = createSchema<GraphQLContext>({
 
 async function getTokensByAddress(
   parent: any, 
-  tokenType: string, 
-  limit: number, 
+  tokenType: string,
   cursor: number, 
+  limit: number,
   prefix: string, 
   redis: Redis
 ) {
@@ -226,11 +226,13 @@ async function getTokensByAddress(
 async function getAddressesByAsset(
   parent: any,
   addressType: string,
+  cursor: number, 
+  limit: number,
   epoch_no: number | null,
   prefix: string,
   redis: Redis
 ) {
-  let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
+  let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
   let key_prefix = prefix ?? `${addressType}_by_asset`
   let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
 
@@ -241,6 +243,8 @@ async function getAddressesByAsset(
     'BYSCORE',
     "WITHSCORES",
   );
+
+  if(addressesByAsset.length == 0) return
 
   var addressKeyName;
   switch(addressType) {
@@ -265,7 +269,7 @@ async function getAddressesByAsset(
     });
   }
   
-  return addresses;
+  return addresses.slice(cursor, cursor + limit);
 }
 
 async function getAddressCountByAsset(
@@ -275,9 +279,9 @@ async function getAddressCountByAsset(
   prefix: string,
   redis: Redis
 ) {
-  let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
+  let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
   let key_prefix = prefix ?? `${addressType}_by_asset`
   let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
-  console.log(key)
+
   return await redis.zcard(key);
 }
