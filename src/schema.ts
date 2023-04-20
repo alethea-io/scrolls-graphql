@@ -238,8 +238,8 @@ async function getAddressesByAsset(
 
   let addressesByAsset = await redis.zrange(
     key,
-    1,
     MAX_SET_SIZE,
+    1,
     "BYSCORE",
     "REV",
     "WITHSCORES",
