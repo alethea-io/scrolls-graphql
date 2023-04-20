@@ -59,14 +59,14 @@ export const schema = createSchema<GraphQLContext>({
     type Query {
       scrolls_address(address: String!): Address
       scrolls_stake_key(stake_key: String!): StakeKey
-      scrolls_token(asset: String!): Token
+      scrolls_token(policy_id: String!, name: String!): Token
     }
   `,
   resolvers: {
     Query: {
       scrolls_address: async (_, { address }) => ({ address }),
       scrolls_stake_key: async (_, { stake_key }) => ({ stake_key }),
-      scrolls_token: async (_, { asset }) => ({ asset }),
+      scrolls_token: async (_, { policy_id, name }) => ({ policy_id, name }),
     },
     Address: {
       balance: async (parent, { prefix=null }, { redis }) => {
@@ -112,58 +112,19 @@ export const schema = createSchema<GraphQLContext>({
     },
     Token: {
       supply: async (parent, { prefix=null }, { redis }) => {
+        let asset = `${parent.policy_id}${parent.name}`
         return await redis.get(
-          `${prefix ?? "supply_by_asset"}.${parent.asset}`
+          `${prefix ?? "supply_by_asset"}.${asset}`
         )
       },
-      addresses: async (parent, { epoch_no=null, prefix=null }, { redis }) => {
-        let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
-        let addresses_by_asset = await redis.zrange(
-          `${prefix ?? "addresses_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
-          1,
-          MAX_SET_SIZE,
-          'BYSCORE',
-          "WITHSCORES",
-        )
-        
-        var addresses = []
-        for (var i = 0; i < addresses_by_asset.length; i+=2) {
-          let address = addresses_by_asset[i]
-          let quantity = parseFloat(addresses_by_asset[i+1])
-
-          addresses.push({
-            address: address,
-            quantity: quantity,
-          })
-        }
-        
-        return addresses
+      addresses: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset(parent, "addresses", epoch_no, prefix, redis);
       },
-      stake_keys: async (parent, { epoch_no=null, prefix=null }, { redis }) => {
-        let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
-        let stake_keys_by_asset = await redis.zrange(
-          `${prefix ?? "stake_keys_by_asset"}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`,
-          1,
-          MAX_SET_SIZE,
-          'BYSCORE',
-          "WITHSCORES",
-        )
-        
-        var stake_keys = []
-        for (var i = 0; i < stake_keys_by_asset.length; i+=2) {
-          let stake_key = stake_keys_by_asset[i]
-          let quantity = parseFloat(stake_keys_by_asset[i+1])
-
-          stake_keys.push({
-            stake_key: stake_key,
-            quantity: quantity,
-          })
-        }
-        
-        return stake_keys
+      stake_keys: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset(parent, "stake_keys", epoch_no, prefix, redis);
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
-        let asset = parent.asset.slice(0, 56) + '.' + parent.asset.slice(56)
+        let asset = `${parent.policy_id}${parent.name}`
         return await redis.get(
           `${prefix ?? "tx_count_by_asset"}.${asset}`
         )
@@ -195,9 +156,6 @@ async function getTokensByAddress(
   let assetsByKey = tokenType == "nft" || tokenType == "handle"
     ? await redis.zrange(`${keyPrefix}.${key}`, 1, 1, "BYSCORE", "WITHSCORES")
     : await redis.zrange(`${keyPrefix}.${key}`, 1, MAX_SET_SIZE, "WITHSCORES")
-
-  console.log(`${keyPrefix}.${key}`)
-  console.log(assetsByKey)
 
   if(assetsByKey.length == 0) return 
   
@@ -241,7 +199,6 @@ async function getTokensByAddress(
           tokens.push(token)
         break
       case "handle":
-        // 815418a1b078a259e678ecccc9d7eac7648d10b88f6f75ce2db8a25a.4672616374696f6e2045737461746520546f6b656e
         if(token.policy_id == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a')
           tokens.push(token)
         break
@@ -256,5 +213,45 @@ async function getTokensByAddress(
   }
 }
 
-async function getAddressesByAsset(parent: any, prefix: string, redis: Redis) {
+async function getAddressesByAsset(
+  parent: any,
+  addressType: string,
+  epoch_no: number | null,
+  prefix: string,
+  redis: Redis
+) {
+  let asset = `${parent.policy_id}${parent.name}`
+  let key = `${prefix ?? addressType}_by_asset.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
+  let addressesByAsset = await redis.zrange(
+    key,
+    1,
+    MAX_SET_SIZE,
+    'BYSCORE',
+    "WITHSCORES",
+  );
+
+  var addressKeyName;
+  switch(addressType) {
+    case "addresses":
+      addressKeyName = "address"
+      break
+    case "stake_keys":
+      addressKeyName = "stake_key"
+      break
+    default:
+      return
+  }
+
+  var addresses = [];
+  for (var i = 0; i < addressesByAsset.length; i += 2) {
+    let item = addressesByAsset[i];
+    let quantity = parseFloat(addressesByAsset[i + 1]);
+
+    addresses.push({
+      [addressKeyName]: item,
+      quantity: quantity,
+    });
+  }
+  
+  return addresses;
 }
