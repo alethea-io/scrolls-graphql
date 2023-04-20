@@ -25,17 +25,17 @@ export const schema = createSchema<GraphQLContext>({
 
     type Address {
       balance(prefix: String): Float
-      tokens(prefix: String): TokenType
-      nfts(prefix: String): TokenType
-      ada_handles(prefix: String): TokenType
+      tokens(cursor: Int, limit: Int, prefix: String): TokenType
+      nfts(cursor: Int, limit: Int, prefix: String): TokenType
+      ada_handles(cursor: Int, limit: Int, prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
     type StakeKey {
       balance(prefix: String): Float
-      tokens(prefix: String): TokenType
-      nfts(prefix: String): TokenType
-      ada_handles(prefix: String): TokenType
+      tokens(cursor: Int, limit: Int, prefix: String): TokenType
+      nfts(cursor: Int, limit: Int, prefix: String): TokenType
+      ada_handles(cursor: Int, limit: Int, prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
@@ -51,9 +51,9 @@ export const schema = createSchema<GraphQLContext>({
 
     type Token {
       supply(prefix: String): Float
-      addresses(prefix: String, epoch_no: Int): [AddressBalance]
+      addresses(cursor: Int, limit: Int, prefix: String, epoch_no: Int): [AddressBalance]
       address_count(prefix: String, epoch_no: Int): Int
-      stake_keys(prefix: String, epoch_no: Int): [StakeKeyBalance]
+      stake_keys(cursor: Int, limit: Int, prefix: String, epoch_no: Int): [StakeKeyBalance]
       stake_key_count(prefix: String, epoch_no: Int): Int
       tx_count(prefix: String): Int
     }
