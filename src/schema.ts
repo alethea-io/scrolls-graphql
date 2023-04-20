@@ -112,7 +112,7 @@ export const schema = createSchema<GraphQLContext>({
     },
     Token: {
       supply: async (parent, { prefix=null }, { redis }) => {
-        let asset = `${parent.policy_id}${parent.name}`
+        let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
         console.log(asset)
         return await redis.get(
           `${prefix ?? "supply_by_asset"}.${asset}`
@@ -125,7 +125,7 @@ export const schema = createSchema<GraphQLContext>({
         return getAddressesByAsset(parent, "stake_keys", epoch_no, prefix, redis);
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
-        let asset = `${parent.policy_id}${parent.name}`
+        let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
         console.log(asset)
         return await redis.get(
           `${prefix ?? "tx_count_by_asset"}.${asset}`
@@ -222,7 +222,7 @@ async function getAddressesByAsset(
   prefix: string,
   redis: Redis
 ) {
-  let asset = `${parent.policy_id}${parent.name}`
+  let asset = `${parent.policy_id.slice(2)}${parent.name.slice(2)}`
   let key = `${prefix ?? addressType}_by_asset.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
   let addressesByAsset = await redis.zrange(
     key,
