@@ -240,7 +240,8 @@ async function getAddressesByAsset(
     key,
     1,
     MAX_SET_SIZE,
-    'BYSCORE',
+    "BYSCORE",
+    "REV",
     "WITHSCORES",
   );
 
