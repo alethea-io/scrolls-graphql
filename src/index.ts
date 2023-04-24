@@ -1,10 +1,13 @@
+import * as dotenv from 'dotenv'
+dotenv.config()
+
 import express from 'express'
 import { createYoga, YogaInitialContext } from 'graphql-yoga'
 import Redis from 'ioredis'
 import { schema } from './schema'
 
-const PORT = process.env.PORT ?? 4000
-const REDIS_URL = process.env.REDIS_URL ?? 'localhost:6379'
+const PORT = process.env.PORT || 4000
+const REDIS_URL = process.env.REDIS_URL || 'localhost:6379'
 
 export interface GraphQLContext extends YogaInitialContext {
   redis: Redis

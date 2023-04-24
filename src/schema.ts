@@ -76,14 +76,14 @@ export const schema = createSchema<GraphQLContext>({
           `${prefix ?? "balance_by_address"}.${parent.address}`
         )
       },
-      tokens: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "fungible", limit, cursor, prefix, redis)
+      tokens: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, prefix, redis})
       },
-      nfts: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "nft", limit, cursor, prefix, redis)
+      nfts: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, prefix, redis})
       },
-      ada_handles: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "handle", limit, cursor, prefix, redis)
+      ada_handles: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, prefix, redis})
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
@@ -97,14 +97,14 @@ export const schema = createSchema<GraphQLContext>({
           `${prefix ?? "balance_by_stake_key"}.${parent.stake_key}`
         )
       },
-      tokens: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "fungible", cursor, limit, prefix, redis)
+      tokens: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, prefix, redis})
       },
-      nfts: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "nft", cursor, limit, prefix, redis)
+      nfts: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, prefix, redis})
       },
-      ada_handles: async (parent, { cursor=0, limit=MAX_SET_SIZE, prefix=null }, { redis }) => {
-        return getTokensByAddress(parent, "handle", cursor, limit, prefix, redis)
+      ada_handles: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, prefix, redis})
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
@@ -120,17 +120,17 @@ export const schema = createSchema<GraphQLContext>({
           `${prefix ?? "supply_by_asset"}.${asset}`
         )
       },
-      addresses: async (parent, { cursor=0, limit=MAX_SET_SIZE, epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressesByAsset(parent, "addresses", cursor, limit, epoch_no, prefix, redis);
+      addresses: async (parent, { cursor=0, limit=null, epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset({parent, addressType: "addresses", cursor, limit, epoch_no, prefix, redis});
       },
       address_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressCountByAsset(parent, "addresses", epoch_no, prefix, redis);
+        return getAddressCountByAsset({parent, addressType: "addresses", epoch_no, prefix, redis});
       },
-      stake_keys: async (parent, { cursor=0, limit=MAX_SET_SIZE, epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressesByAsset(parent, "stake_keys", cursor, limit, epoch_no, prefix, redis);
+      stake_keys: async (parent, { cursor=0, limit=null, epoch_no = null, prefix = null }, { redis }) => {
+        return getAddressesByAsset({parent, addressType: "stake_keys", cursor, limit, epoch_no, prefix, redis});
       },
       stake_key_count: async (parent, { epoch_no = null, prefix = null }, { redis }) => {
-        return getAddressCountByAsset(parent, "stake_keys", epoch_no, prefix, redis);
+        return getAddressCountByAsset({parent, addressType: "stake_keys", epoch_no, prefix, redis});
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
@@ -143,15 +143,14 @@ export const schema = createSchema<GraphQLContext>({
   }
 })
 
-async function getTokensByAddress(
-  parent: any, 
-  tokenType: string,
-  cursor: number, 
-  limit: number,
-  prefix: string, 
-  redis: Redis
-) {
-
+const getTokensByAddress: (input: {
+  parent: any;
+  tokenType: string;
+  cursor: number;
+  limit: number;
+  prefix: string;
+  redis: Redis;
+}) => any = async ({ parent, tokenType, cursor, limit, prefix, redis }) => {
   var key;
   var keyPrefix;
 
@@ -219,19 +218,19 @@ async function getTokensByAddress(
 
   return {
     count: tokens.length,
-    tokens: tokens.slice(cursor, cursor + limit),
+    tokens: tokens.slice(cursor, limit ? cursor + limit : undefined),
   }
 }
 
-async function getAddressesByAsset(
-  parent: any,
-  addressType: string,
-  cursor: number, 
-  limit: number,
+const getAddressesByAsset: (input: {
+  parent: any;
+  addressType: string;
+  cursor: number;
+  limit: number;
   epoch_no: number | null,
-  prefix: string,
-  redis: Redis
-) {
+  prefix: string;
+  redis: Redis;
+}) => any = async ({ parent, addressType, cursor, limit, epoch_no, prefix, redis }) => {
   let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
   let key_prefix = prefix ?? `${addressType}_by_asset`
   let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
@@ -270,16 +269,16 @@ async function getAddressesByAsset(
     });
   }
   
-  return addresses.slice(cursor, cursor + limit);
+  return addresses.slice(cursor, limit ? cursor + limit : undefined)
 }
 
-async function getAddressCountByAsset(
-  parent: any,
-  addressType: string,
+const getAddressCountByAsset: (input: {
+  parent: any;
+  addressType: string;
   epoch_no: number | null,
-  prefix: string,
-  redis: Redis
-) {
+  prefix: string;
+  redis: Redis;
+}) => any = async ({ parent, addressType, epoch_no, prefix, redis }) => {
   let asset = `${parent.policy_id.slice(2)}.${parent.name.slice(2)}`
   let key_prefix = prefix ?? `${addressType}_by_asset`
   let key = `${key_prefix}.${asset}${epoch_no ? "." + epoch_no.toString() : ""}`;
