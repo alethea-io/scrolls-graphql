@@ -237,10 +237,8 @@ const getAddressesByAsset: (input: {
 
   let addressesByAsset = await redis.zrange(
     key,
-    MAX_SET_SIZE,
-    1,
-    "BYSCORE",
-    "REV",
+    -cursor - (limit ?? MAX_SET_SIZE),
+    -(cursor + 1),
     "WITHSCORES",
   );
 
@@ -269,7 +267,7 @@ const getAddressesByAsset: (input: {
     });
   }
   
-  return addresses.slice(cursor, limit ? cursor + limit : undefined)
+  return addresses.reverse()
 }
 
 const getAddressCountByAsset: (input: {
