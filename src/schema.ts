@@ -1,5 +1,6 @@
 import { createSchema } from 'graphql-yoga'
 import Redis from 'ioredis';
+
 import { GraphQLContext } from "./index";
 
 const AssetFingerprint = require('@emurgo/cip14-js').default;
@@ -25,17 +26,17 @@ export const schema = createSchema<GraphQLContext>({
 
     type Address {
       balance(prefix: String): Float
-      tokens(cursor: Int, limit: Int, prefix: String): TokenType
-      nfts(cursor: Int, limit: Int, prefix: String): TokenType
-      ada_handles(cursor: Int, limit: Int, prefix: String): TokenType
+      tokens(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
+      nfts(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
+      ada_handles(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
     type StakeKey {
       balance(prefix: String): Float
-      tokens(cursor: Int, limit: Int, prefix: String): TokenType
-      nfts(cursor: Int, limit: Int, prefix: String): TokenType
-      ada_handles(cursor: Int, limit: Int, prefix: String): TokenType
+      tokens(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
+      nfts(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
+      ada_handles(cursor: Int, limit: Int, filter: String, prefix: String): TokenType
       tx_count(prefix: String): Int
     }
 
@@ -76,14 +77,14 @@ export const schema = createSchema<GraphQLContext>({
           `${prefix ?? "balance_by_address"}.${parent.address}`
         )
       },
-      tokens: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, prefix, redis})
+      tokens: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, filter, prefix, redis})
       },
-      nfts: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, prefix, redis})
+      nfts: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, filter, prefix, redis})
       },
-      ada_handles: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, prefix, redis})
+      ada_handles: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, filter, prefix, redis})
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
@@ -97,14 +98,14 @@ export const schema = createSchema<GraphQLContext>({
           `${prefix ?? "balance_by_stake_key"}.${parent.stake_key}`
         )
       },
-      tokens: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, prefix, redis})
+      tokens: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "fungible", cursor, limit, filter, prefix, redis})
       },
-      nfts: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, prefix, redis})
+      nfts: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "nft", cursor, limit, filter, prefix, redis})
       },
-      ada_handles: async (parent, { cursor=0, limit=null, prefix=null }, { redis }) => {
-        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, prefix, redis})
+      ada_handles: async (parent, { cursor=0, limit=null, filter=null, prefix=null }, { redis }) => {
+        return getTokensByAddress({parent, tokenType: "handle", cursor, limit, filter, prefix, redis})
       },
       tx_count: async (parent, { prefix=null }, { redis }) => {
         return await redis.get(
@@ -148,9 +149,10 @@ const getTokensByAddress: (input: {
   tokenType: string;
   cursor: number;
   limit: number;
+  filter: string;
   prefix: string;
   redis: Redis;
-}) => any = async ({ parent, tokenType, cursor, limit, prefix, redis }) => {
+}) => any = async ({ parent, tokenType, cursor, limit, filter, prefix, redis }) => {
   var key;
   var keyPrefix;
 
@@ -166,7 +168,7 @@ const getTokensByAddress: (input: {
     ? await redis.zrange(`${keyPrefix}.${key}`, 1, 1, "BYSCORE", "WITHSCORES")
     : await redis.zrange(`${keyPrefix}.${key}`, 1, MAX_SET_SIZE, "WITHSCORES")
 
-  if(assetsByKey.length == 0) return 
+  if(assetsByKey.length == 0) return []
   
   // Get supply of each asset
   var assetList = []
@@ -174,45 +176,48 @@ const getTokensByAddress: (input: {
     assetList.push('supply_by_asset.' + assetsByKey[i].replace('.', ''))
   }
   let supplyList = await redis.mget(...assetList)
-
+  
   var tokens = []
   for (var i = 0; i < assetsByKey.length; i+=2) {
-    let subject = assetsByKey[i]
-    let quantity = parseFloat(assetsByKey[i+1])
+    const subject = assetsByKey[i]
+    const quantity = parseFloat(assetsByKey[i+1])
 
-    let policy_id = subject.split('.')[0];
-    let name = subject.split('.')[1];
+    const policy_id = subject.split('.')[0]
+    const name = subject.split('.')[1]
 
-    const fingerprint: string = AssetFingerprint.fromParts(
-      Buffer.from(policy_id, 'hex'), 
-      Buffer.from(name, 'hex')
-    );
+    const policy_id_buffer = Buffer.from(policy_id, 'hex')
+    const name_buffer = Buffer.from(name, 'hex')
 
-    let token = {
-      idx: i/2,
-      policy_id: `\\x${policy_id}`,
-      name: `\\x${name}`,
-      fingerprint: fingerprint,
-      quantity: quantity,
-    }
+    const fingerprint: string = AssetFingerprint.fromParts(policy_id_buffer, name_buffer).fingerprint();
 
-    let supply = parseFloat(supplyList[i/2] ?? "0")
+    if(filter === null || filter === fingerprint || name_buffer.toString('utf8').toLowerCase().includes(filter.toLowerCase())) {
 
-    switch(tokenType) {
-      case "fungible":
-        if(supply > 1) 
-          tokens.push(token)
-        break
-      case "nft":
-        if(supply == 1)
-          tokens.push(token)
-        break
-      case "handle":
-        if(token.policy_id.slice(2) == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a')
-          tokens.push(token)
-        break
-      default:
-        continue
+      let token = {
+        idx: i/2,
+        policy_id: `\\x${policy_id}`,
+        name: `\\x${name}`,
+        fingerprint: fingerprint,
+        quantity: quantity,
+      }
+
+      let supply = parseFloat(supplyList[i/2] ?? "0")
+
+      switch(tokenType) {
+        case "fungible":
+          if(supply > 1) 
+            tokens.push(token)
+          break
+        case "nft":
+          if(supply == 1)
+            tokens.push(token)
+          break
+        case "handle":
+          if(token.policy_id.slice(2) == 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a')
+            tokens.push(token)
+          break
+        default:
+          continue
+      }
     }
   }
 
